@@ -60,9 +60,6 @@ enum ListingType{
 
 
 
-
-
-
 enum Role{ 
   ADMIN
   USER
