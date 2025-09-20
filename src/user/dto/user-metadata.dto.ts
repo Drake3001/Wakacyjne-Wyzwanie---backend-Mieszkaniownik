@@ -1,6 +1,7 @@
 import { Role } from '@prisma/client';
 
 export interface UserMetadata {
+  id: number;
   email: string;
   name: string | null;
   surname: string | null;

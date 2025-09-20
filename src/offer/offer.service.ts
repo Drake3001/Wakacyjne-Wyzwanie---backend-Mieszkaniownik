@@ -7,7 +7,6 @@ import { Offer } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
-import { link } from 'fs';
 
 @Injectable()
 export class OfferService {
@@ -18,15 +17,14 @@ export class OfferService {
   }
 
   
-  async findOneOrCreate(createOfferDto: CreateOfferDto){
-    const myOffer = this.database.offer.findUnique({where: {link}});
-    if (myOffer == null)
-    {
+  async findOneOrCreate(createOfferDto: CreateOfferDto): Promise<Offer> {
+    const myOffer = await this.database.offer.findUnique({
+      where: { link: createOfferDto.link }
+    });
+    if (myOffer == null) {
       return this.create(createOfferDto);
-    }
-    else
-    {
-      return this.update(myOffer.id, createOfferDto as UpdateOfferDto)
+    } else {
+      return this.update(myOffer.id, createOfferDto as UpdateOfferDto);
     }
   }
 
@@ -55,7 +53,7 @@ export class OfferService {
   }
 
   async update(id: number, updateOfferDto: UpdateOfferDto): Promise<Offer> {
-    await this.findOne(id); // Ensure it exists first
+    await this.findOne(id);
 
     return this.database.offer.update({
       where: { id },
@@ -70,7 +68,6 @@ export class OfferService {
     });
   }
 
-  // Additional utility: disable by date
   async deleteExpiredOffers(): Promise<{ count: number }> {
     const result = await this.database.offer.deleteMany({
       where: {

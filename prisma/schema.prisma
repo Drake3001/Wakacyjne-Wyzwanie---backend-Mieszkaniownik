@@ -20,6 +20,18 @@ enum Listing_type{
   HOUSE 
 }
 
+enum NotificationMethod {
+  EMAIL
+  DISCORD
+  BOTH
+}
+
+enum AlertStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
 model User{ 
   id        Int     @id @default(autoincrement())
   email String @unique
@@ -31,15 +43,47 @@ model User{
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
   active Boolean
+  
+  // Relations
+  alerts Alert[]
+  notifications Notification[]
 }
+
+model Alert {
+  id Int @id @default(autoincrement())
+  userId Int
+  name String
+  maxPrice Float
+  minPrice Float?
+  city String
+  district String?
+  rooms Int?
+  minFootage Int?
+  maxFootage Int?
+  type Listing_type?
+  furniture Boolean?
+  pets Boolean?
+  elevator Boolean?
+  notificationMethod NotificationMethod @default(EMAIL)
+  discordWebhook String?
+  status AlertStatus @default(ACTIVE)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matches AlertMatch[]
+  notifications Notification[]
+}
+
 model Offer{ 
-  id Int @id
-  link String
+  id Int @id @default(autoincrement())
+  link String @unique
   price Float
   footage Int?
   rooms Int? 
-  added_at DateTime
-  udpated_at DateTime
+  added_at DateTime @default(now())
+  udpated_at DateTime @updatedAt
   valid_to DateTime? 
   city String
   address String
@@ -48,7 +92,42 @@ model Offer{
   negotiable Boolean? 
   pets_allowed Boolean? 
   floor Int? 
-  elevator Boolean?   
+  elevator Boolean?
+  
+  // Relations
+  matches AlertMatch[]
+}
+
+model AlertMatch {
+  id Int @id @default(autoincrement())
+  alertId Int
+  offerId Int
+  matchedAt DateTime @default(now())
+  notificationSent Boolean @default(false)
+  
+  // Relations
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  
+  @@unique([alertId, offerId])
+}
+
+model Notification {
+  id Int @id @default(autoincrement())
+  userId Int
+  alertId Int?
+  type String
+  title String
+  message String
+  method NotificationMethod
+  sent Boolean @default(false)
+  sentAt DateTime?
+  error String?
+  created_at DateTime @default(now())
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alert Alert? @relation(fields: [alertId], references: [id], onDelete: SetNull)
 }
 
 

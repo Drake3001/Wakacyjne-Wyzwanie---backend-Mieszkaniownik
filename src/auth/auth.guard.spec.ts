@@ -1,4 +1,4 @@
-import { Role } from "../../generated/prisma";
+import { Role } from '@prisma/client';
 
 import type { ExecutionContext } from "@nestjs/common";
 import { UnauthorizedException } from "@nestjs/common";

@@ -49,6 +49,7 @@ export class UserService {
         surname: registerUser.surname,
         password: registerUser.password,
         isEnabled: true,
+        active: true,
       },
     });
   }
@@ -108,11 +109,30 @@ export class UserService {
   async findOneMetadata(email: string): Promise<UserMetadata> {
     const user = await this.database.user.findUnique({
       where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        surname: true,
+        role: true,
+        isEnabled: true,
+        created_at: true,
+        updated_at: true,
+      },
     });
-    if (user == null) {
-      throw new NotFoundException(`User ${email} not found`);
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
-    return this.userToMetadata(user);
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      surname: user.surname,
+      role: user.role,
+      isEnabled: user.isEnabled,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+    };
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -131,6 +151,7 @@ export class UserService {
         password: hashedPassword,
         role: Role.USER,
         isEnabled: true,
+        active: true,
       },
     });
   }
@@ -141,6 +162,7 @@ export class UserService {
 
   private userToMetadata(user: User): UserMetadata {
     return {
+      id: user.id,
       email: user.email,
       name: user.name,
       surname: user.surname,

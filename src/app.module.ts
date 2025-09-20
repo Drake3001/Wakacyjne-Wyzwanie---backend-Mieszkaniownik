@@ -6,9 +6,19 @@ import { DatabaseModule } from './database/database.module';
 import { OfferModule } from './offer/offer.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { AuthModule } from "./auth/auth.module";
+import { AlertModule } from './alert/alert.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
-  imports: [OfferModule,UserModule, DatabaseModule, SchedulerModule, AuthModule],
+  imports: [
+    OfferModule,
+    UserModule, 
+    DatabaseModule, 
+    SchedulerModule, 
+    AuthModule,
+    AlertModule,
+    NotificationModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

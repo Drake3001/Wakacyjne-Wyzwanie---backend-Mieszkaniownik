@@ -1,4 +1,4 @@
-import { Role } from "../../../generated/prisma";
+import { Role } from '@prisma/client';
 
 import {
   CanActivate,
@@ -20,7 +20,7 @@ export class RoleGuard implements CanActivate {
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (requiredRoles === null || requiredRoles.length === 0) {
+    if (!requiredRoles || requiredRoles.length === 0) {
       return true;
     }
     const request: RequestWithUser = context.switchToHttp().getRequest();

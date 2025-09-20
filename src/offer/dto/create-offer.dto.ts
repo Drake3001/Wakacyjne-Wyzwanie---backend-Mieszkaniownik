@@ -40,12 +40,13 @@ export class CreateOfferDto {
   rooms?: number;
 
   @ApiPropertyOptional()
+  @IsOptional()
   @IsDate()
   added_at?: Date;
 
   @ApiPropertyOptional()
-  @IsDate()
   @IsOptional()
+  @IsDate()
   udpated_at?: Date;
 
   @ApiPropertyOptional()
@@ -53,12 +54,12 @@ export class CreateOfferDto {
   @IsDate()
   valid_to?: Date;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   city: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   address: string;
