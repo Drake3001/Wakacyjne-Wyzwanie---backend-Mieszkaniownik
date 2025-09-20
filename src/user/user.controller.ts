@@ -50,11 +50,9 @@ export class UserController {
     status: 404,
     description: "User not found",
   })
-  @UseGuards(AuthGuard, RoleGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post("disable/:email")
-  @Roles(Role.ADMIN)
-  async disableUser(@Param("email") email: string) {
+    async disableUser(@Param("email") email: string) {
     return this.userService.disableAccount(email);
   }
 
@@ -75,7 +73,6 @@ export class UserController {
   })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post("enable/:email")
-  @Roles(Role.ADMIN)
   async enableUser(@Param("email") email: string) {
     return this.userService.enableAccount(email);
   }
