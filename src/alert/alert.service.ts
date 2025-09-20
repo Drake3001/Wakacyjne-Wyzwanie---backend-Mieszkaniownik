@@ -188,111 +188,21 @@ export class AlertService {
   }
 
   async findMatchingAlerts(offer: any): Promise<any[]> {
-    console.log('Searching for alerts matching offer:', {
-      id: offer.id,
-      city: offer.city,
-      price: offer.price,
-      rooms: offer.rooms,
-      furniture: offer.furniture,
-      footage: offer.footage
-    });
-
-    const whereConditions: any = {
-      status: AlertStatus.ACTIVE,
-      AND: [
-        // Price conditions
-        {
-          OR: [
-            { maxPrice: null },
-            { maxPrice: { gte: offer.price } }
-          ]
-        },
-        {
-          OR: [
-            { minPrice: null },
-            { minPrice: { lte: offer.price } }
-          ]
-        },
-        // City condition
-        {
-          OR: [
-            { city: null },
-            { city: { contains: offer.city, mode: 'insensitive' } }
-          ]
-        }
-      ]
-    };
-
-
-    if (offer.rooms) {
-      whereConditions.AND.push({
-        OR: [
-          { rooms: null },
-          { rooms: offer.rooms }
-        ]
+    try {
+      console.log('Searching for alerts matching offer:', {
+        id: offer.id,
+        city: offer.city,
+        price: offer.price,
+        rooms: offer.rooms,
+        furniture: offer.furniture,
+        footage: offer.footage
       });
-    }
 
 
-    if (offer.footage && offer.footage > 0) {
-      whereConditions.AND.push({
-        OR: [
-          { minFootage: null },
-          { minFootage: { lte: offer.footage } }
-        ]
-      });
-      whereConditions.AND.push({
-        OR: [
-          { maxFootage: null },
-          { maxFootage: { gte: offer.footage } }
-        ]
-      });
-    }
-
-
-    if (offer.type) {
-      whereConditions.AND.push({
-        OR: [
-          { type: null },
-          { type: offer.type }
-        ]
-      });
-    }
-
-
-    if (offer.furniture !== null && offer.furniture !== undefined) {
-      whereConditions.AND.push({
-        OR: [
-          { furniture: null },
-          { furniture: offer.furniture }
-        ]
-      });
-    }
-
-
-    if (offer.pets_allowed !== null && offer.pets_allowed !== undefined) {
-      whereConditions.AND.push({
-        OR: [
-          { pets: null },
-          { pets: offer.pets_allowed }
-        ]
-      });
-    }
-
-
-    if (offer.elevator !== null && offer.elevator !== undefined) {
-      whereConditions.AND.push({
-        OR: [
-          { elevator: null },
-          { elevator: offer.elevator }
-        ]
-      });
-    }
-
-    console.log('Query conditions:', JSON.stringify(whereConditions, null, 2));
-
-    const results = await this.database.alert.findMany({
-      where: whereConditions,
+    const allAlerts = await this.database.alert.findMany({
+      where: {
+        status: AlertStatus.ACTIVE,
+      },
       include: {
         user: {
           select: {
@@ -305,10 +215,80 @@ export class AlertService {
       }
     });
 
-    console.log(`Found ${results.length} matching alerts:`, results.map(r => ({ id: r.id, name: r.name, city: r.city })));
+    console.log(`Found ${allAlerts.length} active alerts, now filtering for matches...`);
 
-    return results;
+
+    const matchingAlerts = allAlerts.filter(alert => {
+
+      if (alert.maxPrice !== null && alert.maxPrice < offer.price) {
+        return false;
+      }
+      
+
+      if (alert.minPrice !== null && alert.minPrice > offer.price) {
+        return false;
+      }
+
+
+      if (alert.city !== null && !alert.city.toLowerCase().includes(offer.city.toLowerCase())) {
+        return false;
+      }
+
+ 
+      if (offer.rooms && alert.rooms !== null && alert.rooms !== offer.rooms) {
+        return false;
+      }
+
+
+      if (offer.footage && offer.footage > 0) {
+        if (alert.minFootage !== null && alert.minFootage > offer.footage) {
+          return false;
+        }
+        if (alert.maxFootage !== null && alert.maxFootage < offer.footage) {
+          return false;
+        }
+      }
+
+
+      if (offer.furniture !== null && offer.furniture !== undefined) {
+        if (alert.furniture !== null && alert.furniture !== offer.furniture) {
+          return false;
+        }
+      }
+
+   
+      if (offer.pets_allowed !== null && offer.pets_allowed !== undefined) {
+        if (alert.pets !== null && alert.pets !== offer.pets_allowed) {
+          return false;
+        }
+      }
+
+
+      if (offer.elevator !== null && offer.elevator !== undefined) {
+        if (alert.elevator !== null && alert.elevator !== offer.elevator) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    console.log(`Found ${matchingAlerts.length} matching alerts:`, 
+      matchingAlerts.map(r => ({ 
+        id: r.id, 
+        name: r.name, 
+        city: r.city, 
+        maxPrice: r.maxPrice, 
+        minPrice: r.minPrice 
+      }))
+    );
+
+    return matchingAlerts;
+  } catch (error) {
+    console.error('Error finding matching alerts:', error);
+    throw new Error('Failed to find matching alerts');
   }
+}
 
   private toAlertResponseDto(alert: any): AlertResponseDto {
     return {

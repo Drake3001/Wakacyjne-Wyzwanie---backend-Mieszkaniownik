@@ -14,13 +14,14 @@ export class MatchingService {
     private notificationService: NotificationService,
   ) {}
 
-  async processOffer(offer: any): Promise<void> {
-    this.logger.log(`Processing offer ${offer.id}: ${offer.city} - ${offer.price} PLN`);
-    
+  async processNewOffer(offer: any): Promise<void> {
+    this.logger.log(`Processing new offer: ${offer.id} - ${offer.link}`);
+
     try {
       const matchingAlerts = await this.alertService.findMatchingAlerts(offer);
-      this.logger.log(`Found ${matchingAlerts.length} matching alerts for offer ${offer.id}`);
       
+      this.logger.log(`Found ${matchingAlerts.length} matching alerts for offer ${offer.id}`);
+
       for (const alert of matchingAlerts) {
         await this.createMatch(alert, offer);
       }
@@ -134,16 +135,17 @@ export class MatchingService {
 
     const offers = await this.database.offer.findMany({
       where: {
-        valid_to: {
-          gt: new Date(),
-        },
+        OR: [
+          { valid_to: null },
+          { valid_to: { gt: new Date() } }
+        ]
       },
     });
 
     this.logger.log(`Found ${offers.length} active offers to process`);
 
     for (const offer of offers) {
-      await this.processOffer(offer);
+      await this.processNewOffer(offer);
     }
 
     this.logger.log('Finished processing all offers');
@@ -164,9 +166,10 @@ export class MatchingService {
 
     const offers = await this.database.offer.findMany({
       where: {
-        valid_to: {
-          gt: new Date(),
-        },
+        OR: [
+          { valid_to: null },
+          { valid_to: { gt: new Date() } }
+        ]
       },
     });
 

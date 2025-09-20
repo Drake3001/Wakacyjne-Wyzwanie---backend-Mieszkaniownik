@@ -44,7 +44,6 @@ model User{
   updated_at DateTime @default(now())
   active Boolean
   
-  // Relations
   alerts Alert[]
   notifications Notification[]
 }
@@ -70,7 +69,7 @@ model Alert {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   
-  // Relations
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   matches AlertMatch[]
   notifications Notification[]
@@ -94,7 +93,6 @@ model Offer{
   floor Int? 
   elevator Boolean?
   
-  // Relations
   matches AlertMatch[]
 }
 
@@ -105,7 +103,6 @@ model AlertMatch {
   matchedAt DateTime @default(now())
   notificationSent Boolean @default(false)
   
-  // Relations
   alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
   offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
   
@@ -125,14 +122,9 @@ model Notification {
   error String?
   created_at DateTime @default(now())
   
-  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   alert Alert? @relation(fields: [alertId], references: [id], onDelete: SetNull)
 }
-
-
-
-
 
 enum Role{ 
   ADMIN
