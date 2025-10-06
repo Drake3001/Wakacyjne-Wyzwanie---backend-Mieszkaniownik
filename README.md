@@ -3,7 +3,7 @@
 ## System Overview
 
 ```mermaid
-graph TB
+graph LR
     subgraph "NestJS Application"
         subgraph "Core Modules"
             AM[AuthModule<br/>JWT + Google OAuth]
@@ -350,7 +350,7 @@ flowchart TD
 ## Worker Thread Implementation Details
 
 ```mermaid
-graph TB
+graph LR
     subgraph "Main Thread (NestJS)"
         STM[ScraperThreadManager]
         QUEUES[BullMQ Queues]
