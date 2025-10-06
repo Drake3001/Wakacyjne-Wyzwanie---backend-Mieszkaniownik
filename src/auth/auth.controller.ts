@@ -67,6 +67,22 @@ export class AuthController {
     );
   }
 
+  @Get('google/available')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Check if Google OAuth is available',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Google OAuth availability status',
+  })
+  googleAvailable() {
+    const isAvailable = !!(
+      process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    );
+    return { available: isAvailable };
+  }
+
   @Get('google')
   @UseGuards(AuthGuard('google'))
   @ApiOperation({

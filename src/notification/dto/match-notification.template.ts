@@ -129,7 +129,7 @@ export function generateMatchNotificationTemplate(
         </div>
         <div class="content">
           <h2>Cześć ${userName}!</h2>
-          <p>Twój alert "<strong>${alertName}</strong>" znalazł ${offer.isNew ? '<strong style="color: #EAB308;">NOWĄ OFERTĘ</strong>' : 'nowe dopasowanie'}:</p>
+          <p>Twój alert "<strong>${alertName}</strong>" znalazł ${offer.isNew ? '<strong style="color: #EAB308;">NOWĄ OFERTĘ</strong>' : 'dopasowanie'}:</p>
           
           <div class="property-info">
             <h3>${offer.title}${offer.isNew ? '<span class="badge-new">Nowa</span>' : ''}</h3>
