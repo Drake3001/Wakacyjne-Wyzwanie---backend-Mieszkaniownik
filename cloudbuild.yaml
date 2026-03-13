@@ -1,0 +1,199 @@
+substitutions:
+  _CLUSTER_NAME: "mieszkaniownik-prod-cluster"
+  _CLUSTER_ZONE: "europe-central2-a"
+  _ARTIFACT_REGISTRY: "europe-west3-docker.pkg.dev"
+  _REPOSITORY: "mieszkaniownik-repo"
+  _SERVICE_NAME: "mieszkaniownik-backend"
+  _HELM_RELEASE_NAME: "mieszkaniownik-backend"
+  _NAMESPACE: "production"
+
+options:
+  machineType: "E2_HIGHCPU_8"
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/database-url-prod/versions/latest
+      env: "DATABASE_URL"
+    - versionName: projects/$PROJECT_ID/secrets/jwt-secret-prod/versions/latest
+      env: "JWT_SECRET"
+    - versionName: projects/$PROJECT_ID/secrets/google-client-id-prod/versions/latest
+      env: "GOOGLE_CLIENT_ID"
+    - versionName: projects/$PROJECT_ID/secrets/google-client-secret-prod/versions/latest
+      env: "GOOGLE_CLIENT_SECRET"
+    - versionName: projects/$PROJECT_ID/secrets/google-callback-url-prod/versions/latest
+      env: "GOOGLE_CALLBACK_URL"
+    - versionName: projects/$PROJECT_ID/secrets/discord-client-id-prod/versions/latest
+      env: "DISCORD_CLIENT_ID"
+    - versionName: projects/$PROJECT_ID/secrets/discord-client-secret-prod/versions/latest
+      env: "DISCORD_CLIENT_SECRET"
+    - versionName: projects/$PROJECT_ID/secrets/discord-callback-url-prod/versions/latest
+      env: "DISCORD_CALLBACK_URL"
+    - versionName: projects/$PROJECT_ID/secrets/frontend-url-prod/versions/latest
+      env: "FRONTEND_URL"
+    - versionName: projects/$PROJECT_ID/secrets/cors-origin-prod/versions/latest
+      env: "CORS_ORIGIN"
+    - versionName: projects/$PROJECT_ID/secrets/email-oauth-user-prod/versions/latest
+      env: "EMAIL_OAUTH_USER"
+    - versionName: projects/$PROJECT_ID/secrets/email-oauth-client-id-prod/versions/latest
+      env: "EMAIL_OAUTH_CLIENT_ID"
+    - versionName: projects/$PROJECT_ID/secrets/email-oauth-client-secret-prod/versions/latest
+      env: "EMAIL_OAUTH_CLIENT_SECRET"
+    - versionName: projects/$PROJECT_ID/secrets/email-oauth-refresh-token-prod/versions/latest
+      env: "EMAIL_OAUTH_REFRESH_TOKEN"
+    - versionName: projects/$PROJECT_ID/secrets/redis-password-prod/versions/latest
+      env: "REDIS_PASSWORD"
+    - versionName: projects/$PROJECT_ID/secrets/google-ai-api-key-prod/versions/latest
+      env: "GOOGLE_AI_API_KEY"
+    - versionName: projects/$PROJECT_ID/secrets/google-maps-api-key-backend-prod/versions/latest
+      env: "GOOGLE_MAPS_API_KEY"
+
+steps:
+  - name: "node:20-alpine"
+    id: "install-and-test"
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        pwd
+        ls -la
+        which npm
+        npm --version
+        npm ci
+    env:
+      - "NODE_ENV=test"
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: "build-image"
+    args:
+      - "build"
+      - "-t"
+      - "${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA"
+      - "-t"
+      - "${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:latest"
+      - "-t"
+      - "${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:${BRANCH_NAME}-latest"
+      - "--build-arg"
+      - "NODE_ENV=production"
+      - "--cache-from"
+      - "${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:latest"
+      - "."
+    waitFor: ["install-and-test"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: "push-image"
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}"
+    waitFor: ["build-image"]
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: "get-credentials"
+    args:
+      - "container"
+      - "clusters"
+      - "get-credentials"
+      - "${_CLUSTER_NAME}"
+      - "--zone=${_CLUSTER_ZONE}"
+      - "--project=$PROJECT_ID"
+    waitFor: ["push-image"]
+
+  - name: "gcr.io/$PROJECT_ID/helm"
+    id: "helm-deploy"
+    secretEnv:
+      - "DATABASE_URL"
+      - "JWT_SECRET"
+      - "GOOGLE_CLIENT_ID"
+      - "GOOGLE_CLIENT_SECRET"
+      - "GOOGLE_CALLBACK_URL"
+      - "DISCORD_CLIENT_ID"
+      - "DISCORD_CLIENT_SECRET"
+      - "DISCORD_CALLBACK_URL"
+      - "FRONTEND_URL"
+      - "CORS_ORIGIN"
+      - "EMAIL_OAUTH_USER"
+      - "EMAIL_OAUTH_CLIENT_ID"
+      - "EMAIL_OAUTH_CLIENT_SECRET"
+      - "EMAIL_OAUTH_REFRESH_TOKEN"
+      - "REDIS_PASSWORD"
+      - "GOOGLE_AI_API_KEY"
+      - "GOOGLE_MAPS_API_KEY"
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        echo "Starting Helm deployment..."
+        echo "Release: ${_HELM_RELEASE_NAME}"
+        echo "Tag: $SHORT_SHA"
+        echo "Namespace: ${_NAMESPACE}"
+        set -x
+        helm upgrade --install ${_HELM_RELEASE_NAME} ./helm-chart-backend \
+          --namespace=${_NAMESPACE} \
+          --create-namespace \
+          --set=backend.image.repository=${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME} \
+          --set=backend.image.tag=$SHORT_SHA \
+          --set=databaseJobs.migrate.image.repository=${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME} \
+          --set=databaseJobs.migrate.image.tag=$SHORT_SHA \
+          --set=global.imageRegistry= \
+          --set=backend.env.JWT_SECRET="$$JWT_SECRET" \
+          --set=backend.env.GOOGLE_CLIENT_ID="$$GOOGLE_CLIENT_ID" \
+          --set=backend.env.GOOGLE_CLIENT_SECRET="$$GOOGLE_CLIENT_SECRET" \
+          --set=backend.env.GOOGLE_CALLBACK_URL="$$GOOGLE_CALLBACK_URL" \
+          --set=backend.env.DISCORD_CLIENT_ID="$$DISCORD_CLIENT_ID" \
+          --set=backend.env.DISCORD_CLIENT_SECRET="$$DISCORD_CLIENT_SECRET" \
+          --set=backend.env.DISCORD_CALLBACK_URL="$$DISCORD_CALLBACK_URL" \
+          --set=backend.env.FRONTEND_URL="$$FRONTEND_URL" \
+          --set=backend.env.CORS_ORIGIN="{$$CORS_ORIGIN}" \
+          --set=backend.env.EMAIL_OAUTH_USER="$$EMAIL_OAUTH_USER" \
+          --set=backend.env.EMAIL_OAUTH_CLIENT_ID="$$EMAIL_OAUTH_CLIENT_ID" \
+          --set=backend.env.EMAIL_OAUTH_CLIENT_SECRET="$$EMAIL_OAUTH_CLIENT_SECRET" \
+          --set=backend.env.EMAIL_OAUTH_REFRESH_TOKEN="$$EMAIL_OAUTH_REFRESH_TOKEN" \
+          --set=backend.env.REDIS_PASSWORD="$$REDIS_PASSWORD" \
+          --set=backend.env.GOOGLE_AI_API_KEY="$$GOOGLE_AI_API_KEY" \
+          --set=backend.env.GOOGLE_MAPS_API_KEY="$$GOOGLE_MAPS_API_KEY" \
+          --values=./helm-chart-backend/values-prod.yaml \
+          --timeout=5m \
+          --cleanup-on-fail
+    waitFor: ["get-credentials"]
+
+  - name: "gcr.io/cloud-builders/kubectl"
+    id: "verify-deployment"
+    args:
+      - "rollout"
+      - "status"
+      - "deployment/${_HELM_RELEASE_NAME}"
+      - "-n"
+      - "${_NAMESPACE}"
+      - "--timeout=5m"
+    waitFor: ["helm-deploy"]
+
+  - name: "gcr.io/cloud-builders/kubectl"
+    id: "smoke-test"
+    args:
+      - "get"
+      - "pods"
+      - "-n"
+      - "${_NAMESPACE}"
+      - "-l"
+      - "app.kubernetes.io/name=${_HELM_RELEASE_NAME}"
+    waitFor: ["verify-deployment"]
+
+images:
+  - "${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA"
+  - "${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:latest"
+  - "${_ARTIFACT_REGISTRY}/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:${BRANCH_NAME}-latest"
+
+artifacts:
+  objects:
+    location: "gs://$PROJECT_ID-build-artifacts"
+    paths:
+      - "helm-chart-backend/**"
+
+timeout: "1800s"
+
+tags:
+  - "mieszkaniownik-backend"
+  - "${BRANCH_NAME}"
+  - "$SHORT_SHA"

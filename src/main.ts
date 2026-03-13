@@ -1,20 +1,102 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+
+import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: false,
+      forbidUnknownValues: true,
+    }),
+  );
+
+  app.enableCors({
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Cache-Control",
+      "Accept",
+      "Accept-Encoding",
+      "Accept-Language",
+      "Connection",
+    ],
+    exposedHeaders: ["Cache-Control", "Connection", "Content-Type"],
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
+      if (origin == null) {
+        callback(null, true);
+        return;
+      }
+
+      const localhostPattern = /^https?:\/\/localhost:(50\d{2}|5[1-5]\d{2})$/;
+      const ipPattern =
+        /^https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:(50\d{2}|5[1-5]\d{2})$/;
+
+      const dockerPattern =
+        /^https?:\/\/(frontend|mieszkaniownik-frontend)(:\d+)?$/;
+
+      const allowedDomains = [
+        "http://mieszkaniownik-dev.local",
+        "http://mieszkaniownik-prod.local",
+        "https://mieszkaniownik.wsparcie.dev",
+        "https://api.mieszkaniownik.wsparcie.dev",
+        "https://app.mieszkaniownik.wsparcie.dev",
+        "http://34.116.180.59:5173",
+        "http://34.118.127.11:5173",
+      ];
+
+      const envOrigins =
+        process.env.CORS_ORIGIN?.split(",").map((o) => o.trim()) ?? [];
+      const allAllowedDomains = [...allowedDomains, ...envOrigins];
+
+      if (
+        localhostPattern.test(origin) ||
+        ipPattern.test(origin) ||
+        dockerPattern.test(origin) ||
+        allAllowedDomains.includes(origin)
+      ) {
+        callback(null, true);
+        return;
+      }
+
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[CORS] Allowing origin in development mode: ${origin}`);
+        callback(null, true);
+        return;
+      }
+
+      console.error(`[CORS] Origin not allowed: ${origin}`);
+      callback(new Error("Not allowed by CORS"), false);
+    },
+    preflightContinue: false,
+    credentials: true,
+  });
+
   const config = new DocumentBuilder()
-    .setTitle('API Dokumentacja')
-    .setDescription('API opisane za pomocą Swaggera')
-    .setVersion('1.0')
-    .addTag('api') // opcjonalnie
+    .setTitle("API Mieszkaniownik")
+    .setDescription(
+      `Mieszkaniownik is a solution designed for students looking for an apartment or room to rent. With the current turnover of rental offers on platforms like OLX, every second counts. Why spend hours refreshing the website when you can simply create an alert, specify what kind of apartment you're interested in and your budget? Then, as soon as an offer appears, you'll receive a notification via email or Discord with all the most important information.`,
+    )
+    .setVersion("1.0")
+    .addTag("api")
+    .addBearerAuth(
+      { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      "access-token",
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup("api", app, document);
 
-  await app.listen(3000);
+  await app.listen(process.env.PORT ?? 5001);
 }
-bootstrap();
+void bootstrap();

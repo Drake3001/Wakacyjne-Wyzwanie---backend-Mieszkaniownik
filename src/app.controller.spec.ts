@@ -1,8 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import type { TestingModule } from "@nestjs/testing";
+import { Test } from "@nestjs/testing";
 
-describe('AppController', () => {
+import { AppController } from "./app.controller";
+import { AppService } from "./app.service";
+
+describe("AppController", () => {
   let appController: AppController;
 
   beforeEach(async () => {
@@ -14,9 +16,14 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+  describe("root", () => {
+    it("should return health check", () => {
+      const result = appController.healthCheck();
+      expect(result).toHaveProperty("status", "ok");
+      expect(result).toHaveProperty("timestamp");
+      expect(result).toHaveProperty("uptime");
+      expect(typeof result.timestamp).toBe("string");
+      expect(typeof result.uptime).toBe("number");
     });
   });
 });

@@ -5,50 +5,40 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
 
-import { CreateUserDto } from "../user/dto/create-user.dto";
-import { UserMetadata } from "../user/dto/user-metadata.dto";
+import { RegisterDto } from "../user/dto/register.dto";
+import { UserResponseDto } from "../user/dto/user-response.dto";
 import { UserService } from "../user/user.service";
+import { DiscordUser } from "./dto/discord-user.interface";
+import { GoogleUser } from "./dto/google-user.interface";
 import { ResponseDto } from "./dto/response.dto";
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly jwtService: JwtService,
+  ) {}
 
-  private readonly tokenPrefix = "token_";
-
-  private get expiryTimeMs(): number {
-    return Number.parseInt(process.env.EXPIRY_TIME_MS ?? "3600000");
+  private async generateToken(email: string): Promise<string> {
+    const user = await this.userService.findOne(email);
+    if (user === null) {
+      throw new UnauthorizedException("User not found");
+    }
+    const payload = { email, sub: email, role: user.role };
+    return this.jwtService.sign(payload);
   }
 
-  private generateToken(email: string): string {
-    const issuedAt = Date.now();
-    return `${this.tokenPrefix}${email}_${issuedAt.toString()}`;
-  }
-
-  async validateToken(token: string): Promise<UserMetadata> {
-    if (!token.startsWith(this.tokenPrefix)) {
-      throw new UnauthorizedException("Invalid token format");
-    }
-    const parts = token.slice(this.tokenPrefix.length).split("_");
-    if (parts.length !== 2) {
-      throw new UnauthorizedException("Invalid token format");
-    }
-    const [email, issuedAtString] = parts;
-    if (!email || !issuedAtString) {
-      throw new UnauthorizedException("Invalid token format");
-    }
-    const issuedAt = Number(issuedAtString);
-    if (Number.isNaN(issuedAt)) {
-      throw new UnauthorizedException("Invalid token format");
-    }
-    const now = Date.now();
-    if (now - issuedAt > this.expiryTimeMs) {
-      throw new UnauthorizedException("Token has expired");
-    }
+  async validateToken(payload: {
+    email: string;
+    sub: string;
+  }): Promise<UserResponseDto> {
     try {
-      const userMetadata = await this.userService.findOneMetadata(email);
-      return userMetadata;
+      const userResponseDto = await this.userService.findOneMetadata(
+        payload.email,
+      );
+      return userResponseDto;
     } catch {
       throw new UnauthorizedException("Invalid token: user not found");
     }
@@ -59,19 +49,23 @@ export class AuthService {
     if (user === null) {
       throw new UnauthorizedException();
     }
-    if (!user.isEnabled) {
+    if (!user.active) {
       throw new UnauthorizedException();
     }
     let passwordMatches: boolean;
     try {
-      passwordMatches = await compare(password, user.password);
+      passwordMatches =
+        user.password !== null && user.password !== ""
+          ? await compare(password, user.password)
+          : false;
     } catch {
       passwordMatches = false;
     }
     if (!passwordMatches) {
       throw new UnauthorizedException();
     }
-    return { token: this.generateToken(user.email) };
+    const token = await this.generateToken(user.email);
+    return { token };
   }
 
   async signUp(
@@ -80,21 +74,134 @@ export class AuthService {
     surname: string | undefined,
     password: string,
   ): Promise<ResponseDto> {
-    const existingUser = await this.userService.findOne(email);
-    if (existingUser != null) {
-      if (!existingUser.isEnabled) {
-        throw new ConflictException("User with this email is disabled");
+    try {
+      const existingUser = await this.userService.findOne(email);
+      if (existingUser !== null) {
+        if (!existingUser.active) {
+          throw new ConflictException("User with this email is disabled");
+        }
+        throw new ConflictException("User with this email exists");
       }
-      throw new ConflictException("User with this email exists");
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
     }
-    const createUserDto: CreateUserDto = {
+
+    const registerDto: RegisterDto = {
       email,
+      password,
       name,
       surname,
-      password,
     };
-    const user = await this.userService.create(createUserDto);
-    const token = this.generateToken(user.email);
+    const user = await this.userService.create(registerDto);
+    const payload = { email: user.email, sub: user.email, role: user.role };
+    const token = this.jwtService.sign(payload);
     return { token };
+  }
+
+  async googleLogin(googleUser: GoogleUser): Promise<ResponseDto> {
+    try {
+      const user = await this.userService
+        .findOne(googleUser.email)
+        .catch(() => null);
+
+      if (user === null) {
+        const registerDto: RegisterDto = {
+          email: googleUser.email,
+          name: googleUser.name,
+          surname: googleUser.surname,
+          googleId: googleUser.googleId,
+          password: "",
+        };
+
+        const newUser = await this.userService.createGoogleUser(registerDto);
+
+        const payload = {
+          email: newUser.email,
+          sub: newUser.email,
+          role: newUser.role,
+        };
+        const token = this.jwtService.sign(payload);
+        return { token };
+      }
+
+      if (user.googleId === null || user.googleId === "") {
+        await this.userService.updateGoogleId(user.email, googleUser.googleId);
+      }
+
+      if (!user.active) {
+        throw new UnauthorizedException("User account is disabled");
+      }
+
+      const payload = { email: user.email, sub: user.email, role: user.role };
+      const token = this.jwtService.sign(payload);
+      return { token };
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+      console.error("Google authentication error:", error);
+      throw new UnauthorizedException("Google authentication failed");
+    }
+  }
+
+  async discordLogin(discordUser: DiscordUser): Promise<ResponseDto> {
+    try {
+      const user = await this.userService
+        .findOne(discordUser.email)
+        .catch(() => null);
+
+      if (user === null) {
+        const registerDto: RegisterDto = {
+          email: discordUser.email,
+          name: discordUser.name,
+          surname: discordUser.surname,
+          username: discordUser.username,
+          discordId: discordUser.discordId,
+          password: "",
+        };
+
+        const newUser = await this.userService.createDiscordUser(registerDto);
+
+        const payload = {
+          email: newUser.email,
+          sub: newUser.email,
+          role: newUser.role,
+        };
+        const token = this.jwtService.sign(payload);
+        return { token };
+      }
+
+      if (user.discordId === null || user.discordId === "") {
+        await this.userService.updateDiscordId(
+          user.email,
+          discordUser.discordId,
+        );
+      }
+
+      if (!user.active) {
+        throw new UnauthorizedException("User account is disabled");
+      }
+
+      const payload = { email: user.email, sub: user.email, role: user.role };
+      const token = this.jwtService.sign(payload);
+      return { token };
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+      console.error("Discord authentication error:", error);
+      throw new UnauthorizedException("Discord authentication failed");
+    }
   }
 }

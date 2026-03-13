@@ -1,15 +1,14 @@
 import { ValidatorConstraint, registerDecorator } from "class-validator";
 import type {
-  ValidationArguments,
   ValidationOptions,
   ValidatorConstraintInterface,
 } from "class-validator";
 
 @ValidatorConstraint({ name: "NicePassword", async: false })
 export class NicePasswordConstraint implements ValidatorConstraintInterface {
-  validate(password: string, _arguments_: ValidationArguments): boolean {
-    if (!password) {
-      return false;
+  validate(password: string): boolean {
+    if (!password || password === "") {
+      return true;
     }
     if (password.length < 8) {
       return false;
@@ -20,13 +19,13 @@ export class NicePasswordConstraint implements ValidatorConstraintInterface {
     if (!/[0-9]/.test(password)) {
       return false;
     }
-    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
+    if (!/[!@#$%^&*()_+\-=[\]{};':'\\|,.<>/?]/.test(password)) {
       return false;
     }
     return true;
   }
-  defaultMessage(_arguments_: ValidationArguments): string {
-    return "That's not a nice password, is it? (length must be >=8 and have at least one from every: uppercases/digits/specials)";
+  defaultMessage(): string {
+    return "Password must be at least 8 characters long and contain uppercase, digit, and special character (leave empty for OAuth login)";
   }
 }
 

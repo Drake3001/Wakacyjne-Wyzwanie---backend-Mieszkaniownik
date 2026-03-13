@@ -3,17 +3,18 @@ import {
   IsNotEmpty,
   IsString,
   MaxLength,
-  Validate
+  Validate,
 } from "class-validator";
 
 import { ApiProperty } from "@nestjs/swagger";
+
 import { NicePassword } from "../../validators/password.validator";
 
 export class LoginDto {
   @ApiProperty()
   @IsEmail()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(255)
   @IsNotEmpty()
   email: string;
 

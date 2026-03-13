@@ -1,39 +1,46 @@
-import { Request } from "express";
-
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
-
-import { AuthService } from "./auth.service";
-import { RequestWithUser } from "./dto/request-with-user.dto";
+import { ExecutionContext, Injectable } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { AuthGuard as PassportAuthGuard } from "@nestjs/passport";
 
 @Injectable()
-export class AuthGuard implements CanActivate {
-  constructor(private authService: AuthService) {}
-
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request: RequestWithUser = context.switchToHttp().getRequest();
-    const token = this.extractTokenFromHeader(request);
-    if (token === undefined) {
-      throw new UnauthorizedException("Missing token");
-    }
-    try {
-      request.user = await this.authService.validateToken(token);
-    } catch (error) {
-      throw new UnauthorizedException((error as Error).message);
-    }
-    return true;
+export class AuthGuard extends PassportAuthGuard("jwt") {
+  constructor(private readonly reflector: Reflector) {
+    super();
   }
 
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const authorization = request.headers.authorization?.trim();
-    if (authorization === undefined || authorization === "") {
-      return undefined;
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>("isPublic", [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      const result = super.canActivate(context);
+      return result instanceof Promise ? await result : Boolean(result);
     }
-    const [type, token] = authorization.split(/\s+/);
-    return type === "Bearer" ? token : undefined;
+
+    const result = super.canActivate(context);
+    return result instanceof Promise ? await result : Boolean(result);
+  }
+
+  handleRequest<T>(
+    error: Error | null,
+    user: T | false,
+    _info: unknown,
+    context: ExecutionContext,
+  ) {
+    const isPublic = this.reflector.getAllAndOverride<boolean>("isPublic", [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return user === false ? null : user;
+    }
+
+    if (error !== null || user === false) {
+      throw error ?? new Error("Unauthorized");
+    }
+    return user;
   }
 }

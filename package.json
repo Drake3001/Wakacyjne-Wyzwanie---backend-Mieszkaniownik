@@ -1,48 +1,119 @@
 {
   "name": "mieszkaniownik",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
   "private": true,
-  "license": "UNLICENSED",
+  "description": "",
+  "license": "MIT",
+  "author": "",
   "scripts": {
     "build": "nest build",
+    "cleanup": "bash cleanup-processes.sh",
+    "cleanup:silent": "bash cleanup-processes.sh --silent",
+    "email:health": "curl http://localhost:3000/health/email",
+    "email:setup": "echo 'Follow these steps:' && echo '1. npm run oauth2:tokens CLIENT_ID CLIENT_SECRET' && echo '2. Update .env with OAuth2 credentials' && echo '3. npm run test:email' && echo '4. npm run email:health'",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "format:check": "prettier --check .",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "oauth2:diagnose": "node diagnose-oauth2.js",
+    "oauth2:guide": "node oauth-playground-guide.js",
+    "oauth2:tokens": "node get-oauth2-tokens.js",
+    "oauth2:tokens:web": "node get-oauth2-tokens.js $1 $2 --web",
+    "predev": "npm run cleanup:silent",
+    "prepare": "husky || true",
+    "prestart": "npm run cleanup:silent",
+    "start": "nest start",
+    "start:debug": "nest start --debug --watch",
+    "prestart:dev": "npm run cleanup:silent",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/src/main",
+    "pretest": "npm run cleanup:silent",
     "test": "jest",
-    "test:watch": "jest --watch",
+    "posttest": "npm run cleanup:silent",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:discord": "ts-node test-discord-images.ts",
+    "pretest:e2e": "npm run cleanup:silent",
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "posttest:e2e": "npm run cleanup:silent",
+    "test:email": "node test-email-oauth.js",
+    "test:google-ai": "ts-node test-google-ai-extraction.ts",
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "lint-staged": {
+    "*": "prettier -w --ignore-unknown"
+  },
+  "prettier": "@solvro/config/prettier",
+  "jest": {
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testEnvironment": "node",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    }
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@huggingface/inference": "^4.9.0",
+    "@nestjs/bullmq": "^11.0.3",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/jwt": "^11.0.0",
     "@nestjs/mapped-types": "*",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.0.1",
     "@nestjs/swagger": "^11.2.0",
     "@prisma/client": "^6.16.2",
     "@types/bcrypt": "^6.0.0",
-    "bcrypt": "^6.0.0",
+    "@types/nodemailer": "^7.0.1",
+    "@types/passport-google-oauth20": "^2.0.16",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/passport-oauth2": "^1.8.0",
     "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
+    "bullmq": "^5.58.9",
+    "cheerio": "^1.1.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
-    "prisma": "^6.16.2",
+    "discord.js": "^14.22.1",
+    "dotenv": "^17.2.3",
+    "google-auth-library": "^10.4.0",
+    "googleapis": "^161.0.0",
+    "ioredis": "^5.8.0",
+    "jsdom": "^27.0.0",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.6",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-jwt": "^4.0.1",
+    "passport-oauth2": "^1.8.0",
+    "puppeteer": "^24.22.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
+    "@solvro/config": "^2.0.7",
+    "@types/dotenv": "^6.1.1",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
@@ -51,36 +122,19 @@
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^16.0.0",
+    "husky": "^9.1.7",
     "jest": "^30.0.0",
+    "lint-staged": "^16.2.4",
     "prettier": "^3.4.2",
     "prisma": "^6.16.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.2",
-    "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "seed": "tsx prisma/seed.ts"
   }
 }
